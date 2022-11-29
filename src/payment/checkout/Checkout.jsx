@@ -87,6 +87,10 @@ class Checkout extends React.Component {
     );
   };
 
+  handleSubmitStripe = (formData) => {
+    this.props.submitPayment({ method: 'stripe', ...formData });
+  };
+
   handleSubmitStripeButtonClick = () => {
     sendTrackEvent(
       'edx.bi.ecommerce.basket.payment_selected',
@@ -262,6 +266,7 @@ class Checkout extends React.Component {
           <Elements options={options} stripe={stripePromise}>
             <StripePaymentForm
               options={options}
+              onSubmitPayment={this.handleSubmitStripe}
               onSubmitButtonClick={this.handleSubmitStripeButtonClick}
               disabled={submitting}
               isBulkOrder={isBulkOrder}
@@ -312,7 +317,7 @@ Checkout.propTypes = {
   isFreeBasket: PropTypes.bool,
   submitting: PropTypes.bool,
   isBasketProcessing: PropTypes.bool,
-  paymentMethod: PropTypes.oneOf(['paypal', 'apple-pay', 'cybersource']),
+  paymentMethod: PropTypes.oneOf(['paypal', 'apple-pay', 'cybersource', 'stripe']),
   orderType: PropTypes.oneOf(Object.values(ORDER_TYPES)),
   enableStripePaymentProcessor: PropTypes.bool,
   clientSecretId: PropTypes.string,
