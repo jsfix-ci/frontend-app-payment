@@ -49,6 +49,9 @@ function StripePaymentForm({
   // TODO: rename to distinguish loading of data and loading of card details
   const showLoadingButton = loading || isQuantityUpdating || isLoading || !stripe || !elements;
 
+  // Generate comma separated list of product SKUs
+  const skus = products.map(({ sku }) => sku).join(',');
+
   useEffect(() => {
     // Focus on first input with an errror in the form
     if (
@@ -73,6 +76,9 @@ function StripePaymentForm({
   const onSubmit = async (values) => {
     // istanbul ignore if
     if (disabled) { return; }
+
+    // Clear the error message displayed at the bottom of the Stripe form
+    setMessage('');
 
     setshouldFocusFirstError(true);
     const requiredFields = getRequiredFields(values, isBulkOrder, enableStripePaymentProcessor);
@@ -106,27 +112,47 @@ function StripePaymentForm({
       // Make sure to disable form submission until Stripe.js has loaded.
       return;
     }
-    setMessage('');
-    setIsLoading(true);
 
-    onSubmitPayment({
-      cardHolderInfo: {
-        firstName,
-        lastName,
-        address,
-        unit,
-        city,
-        country,
-        state,
-        postalCode,
-        organization,
-        purchasedForOrganization,
-      },
-      stripe,
-      elements,
-      context,
-      products,
-    });
+    // Disable submit button before sending billing info to Stripe and calling ecommerce
+    setIsLoading(true);
+    try {
+      const result = await stripe.updatePaymentIntent({
+        elements,
+        params: {
+          payment_method_data: {
+            billing_details: {
+              address: {
+                city,
+                country,
+                line1: address,
+                line2: unit || '',
+                postal_code: postalCode || '',
+                state: state || '',
+              },
+              email: context.authenticatedUser.email,
+              name: `${firstName} ${lastName}`,
+            },
+            metadata: {
+              organization, // JK TODO: check how ecommerce is receiving this
+              purchased_for_organization: purchasedForOrganization,
+            },
+          },
+        },
+      });
+      onSubmitPayment({
+        paymentIntentId: result.paymentIntent.id,
+        skus,
+      });
+    } catch (error) {
+      // Show updatePaymentIntent error by the Stripe billing form fields
+      if (error.type === 'card_error' || error.type === 'validation_error') {
+        setMessage(error.message);
+      } else {
+        setMessage('An unexpected error occurred.');
+      }
+      // Submit button should not be disabled after an error occured that the user can fix and re-submit
+      setIsLoading(false);
+    }
   };
 
   const stripeElementsOnReady = () => {
